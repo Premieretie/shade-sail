@@ -220,4 +220,33 @@ function drawCanvas(pts) {
 }
 
 // Init
-generatePoints();
+function generatePoints() {
+  const container = document.getElementById("pointsContainer");
+  const n = parseInt(document.getElementById("numPoints").value);
+
+  if (n !== 3) {
+    container.innerHTML = "⚠️ Currently supports 3-point sails only";
+    return;
+  }
+
+  container.innerHTML = `
+    <h3>Measurements (mm)</h3>
+
+    AB: <input id="ab" value="5000"><br>
+    AC: <input id="ac" value="4500"><br>
+    BC: <input id="bc" value="4800"><br>
+
+    <h3>Heights</h3>
+
+    Datum:
+    <select id="datum">
+      <option value="0">A</option>
+      <option value="1">B</option>
+      <option value="2">C</option>
+    </select><br><br>
+
+    A: <input id="h0" value="0"><br>
+    B: <input id="h1" value="1000"><br>
+    C: <input id="h2" value="300"><br>
+  `;
+}
