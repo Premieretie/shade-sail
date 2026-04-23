@@ -13,19 +13,33 @@ function generatePoints() {
   const container = document.getElementById("pointsContainer");
   const n = parseInt(document.getElementById("numPoints").value);
 
-  container.innerHTML = "";
-
-  for (let i = 0; i < n; i++) {
-    container.innerHTML += `
-      <div class="point">
-        <strong>Point ${label(i)}</strong><br>
-        X: <input id="x${i}" value="${100 + i * 500}">
-        Y: <input id="y${i}" value="${100 + i * 300}">
-        H: <input id="h${i}" value="${2500}">
-      </div>
-    `;
+  if (n !== 3) {
+    container.innerHTML = "⚠️ Currently supports 3-point sails only";
+    return;
   }
+
+  container.innerHTML = `
+    <h3>Measurements (mm)</h3>
+
+    AB: <input id="ab" value="5000"><br>
+    AC: <input id="ac" value="4500"><br>
+    BC: <input id="bc" value="4800"><br>
+
+    <h3>Heights</h3>
+
+    Datum:
+    <select id="datum">
+      <option value="0">A</option>
+      <option value="1">B</option>
+      <option value="2">C</option>
+    </select><br><br>
+
+    A: <input id="h0" value="0"><br>
+    B: <input id="h1" value="1000"><br>
+    C: <input id="h2" value="300"><br>
+  `;
 }
+
 
 // Get points safely
 function getPoints() {
@@ -130,56 +144,88 @@ function hardwareSuggestion(maxSpan) {
 
 // Main calculation
 function calculate() {
-  const pts = getPoints();
-  if (!pts) return;
+  let ab = parseFloat(document.getElementById("ab").value);
+  let ac = parseFloat(document.getElementById("ac").value);
+  let bc = parseFloat(document.getElementById("bc").value);
 
-  let result = "<h3>Edge Lengths (Adjusted)</h3>";
+  let datumIndex = parseInt(document.getElementById("datum").value);
 
-  let maxSpan = 0;
+  let heights = [
+    parseFloat(document.getElementById("h0").value),
+    parseFloat(document.getElementById("h1").value),
+    parseFloat(document.getElementById("h2").value)
+  ];
 
-  // Edges
-  for (let i = 0; i < pts.length; i++) {
-    let next = (i + 1) % pts.length;
-
-    let d = distance(pts[i], pts[next]);
-    let tension = getTensionFactor(d);
-    let adjusted = d * (1 - tension);
-
-    if (d > maxSpan) maxSpan = d;
-
-    result += `
-      ${label(i)} → ${label(next)}:
-      ${d.toFixed(0)}mm → 
-      <strong>${adjusted.toFixed(0)}mm</strong>
-      (${(tension * 100).toFixed(0)}% reduction)<br>
-    `;
+  if ([ab, ac, bc].some(isNaN)) {
+    alert("Invalid measurements");
+    return;
   }
 
-  // Diagonals
-  if (pts.length >= 4) {
-    let diagonals = calculateDiagonals(pts);
+  // Normalize heights (datum = 0)
+  let datumHeight = heights[datumIndex];
+  heights = heights.map(h => h - datumHeight);
 
-    result += "<h3>Diagonals</h3>";
-
-    diagonals.forEach(d => {
-      result += `
-        ${label(d.from)} → ${label(d.to)}:
-        ${d.d.toFixed(0)}mm<br>
-      `;
-    });
+  // 3D distances (accounts for height difference)
+  function adjustedLength(base, h1, h2) {
+    let dz = h2 - h1;
+    return Math.sqrt(base * base + dz * dz);
   }
+
+  let AB_3D = adjustedLength(ab, heights[0], heights[1]);
+  let AC_3D = adjustedLength(ac, heights[0], heights[2]);
+  let BC_3D = adjustedLength(bc, heights[1], heights[2]);
+
+  // Apply tension reduction
+  function tension(length) {
+    if (length < 4000) return 0.08;
+    if (length < 7000) return 0.10;
+    return 0.12;
+  }
+
+  function adjusted(length) {
+    let t = tension(length);
+    return length * (1 - t);
+  }
+
+  let result = `
+    <h3>3D Edge Lengths</h3>
+
+    AB: ${AB_3D.toFixed(0)} → <strong>${adjusted(AB_3D).toFixed(0)}</strong><br>
+    AC: ${AC_3D.toFixed(0)} → <strong>${adjusted(AC_3D).toFixed(0)}</strong><br>
+    BC: ${BC_3D.toFixed(0)} → <strong>${adjusted(BC_3D).toFixed(0)}</strong><br>
+  `;
 
   // Height check
-  result += "<h3>Height Check</h3>";
-  result += checkHeights(pts);
+  let maxH = Math.max(...heights);
+  let minH = Math.min(...heights);
+  let diff = maxH - minH;
 
-  // Hardware
-  result += "<h3>Hardware Suggestion</h3>";
-  result += hardwareSuggestion(maxSpan);
+  result += "<h3>Height Check</h3>";
+
+  if (diff < 200) {
+    result += "⚠️ Too flat (water pooling risk)";
+  } else if (diff < 400) {
+    result += "⚠️ Low variation";
+  } else {
+    result += "✅ Good tension shape";
+  }
+
+  // Hardware suggestion
+  let maxSpan = Math.max(AB_3D, AC_3D, BC_3D);
+
+  result += "<h3>Hardware</h3>";
+
+  if (maxSpan < 4000) {
+    result += "M8 Turnbuckle / M10 Eye Bolt";
+  } else if (maxSpan < 6000) {
+    result += "M10 Turnbuckle / M12 Eye Bolt";
+  } else {
+    result += "M12 Turnbuckle / M12–M16 Eye Bolt";
+  }
 
   document.getElementById("results").innerHTML = result;
 
-  drawCanvas(pts);
+  drawTriangle(ab, ac, bc);
 }
 
 // Draw layout
@@ -220,33 +266,5 @@ function drawCanvas(pts) {
 }
 
 // Init
-function generatePoints() {
-  const container = document.getElementById("pointsContainer");
-  const n = parseInt(document.getElementById("numPoints").value);
-
-  if (n !== 3) {
-    container.innerHTML = "⚠️ Currently supports 3-point sails only";
-    return;
-  }
-
-  container.innerHTML = `
-    <h3>Measurements (mm)</h3>
-
-    AB: <input id="ab" value="5000"><br>
-    AC: <input id="ac" value="4500"><br>
-    BC: <input id="bc" value="4800"><br>
-
-    <h3>Heights</h3>
-
-    Datum:
-    <select id="datum">
-      <option value="0">A</option>
-      <option value="1">B</option>
-      <option value="2">C</option>
-    </select><br><br>
-
-    A: <input id="h0" value="0"><br>
-    B: <input id="h1" value="1000"><br>
-    C: <input id="h2" value="300"><br>
-  `;
-}
+generatePoints() 
+  
