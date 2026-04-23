@@ -229,42 +229,39 @@ function calculate() {
 }
 
 // Draw layout
-function drawCanvas(pts) {
+function drawTriangle(ab, ac, bc) {
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  let maxX = Math.max(...pts.map(p => p.x));
-  let maxY = Math.max(...pts.map(p => p.y));
+  // Place A at origin
+  let A = { x: 50, y: 200 };
 
-  let scale = 250 / Math.max(maxX, maxY);
+  // Place B horizontally
+  let B = { x: A.x + ab / 20, y: A.y };
 
+  // Calculate C using triangle math
+  let cosC = (ab*ab + ac*ac - bc*bc) / (2 * ab * ac);
+  let angle = Math.acos(cosC);
+
+  let C = {
+    x: A.x + (ac / 20) * Math.cos(angle),
+    y: A.y - (ac / 20) * Math.sin(angle)
+  };
+
+  // Draw triangle
   ctx.beginPath();
-
-  pts.forEach((p, i) => {
-    let x = p.x * scale + 20;
-    let y = p.y * scale + 20;
-
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-
-    ctx.fillText(label(i), x + 5, y + 5);
-  });
-
+  ctx.moveTo(A.x, A.y);
+  ctx.lineTo(B.x, B.y);
+  ctx.lineTo(C.x, C.y);
   ctx.closePath();
   ctx.stroke();
 
-  pts.forEach(p => {
-    let x = p.x * scale + 20;
-    let y = p.y * scale + 20;
-
-    ctx.beginPath();
-    ctx.arc(x, y, 4, 0, Math.PI * 2);
-    ctx.fill();
-  });
+  // Labels
+  ctx.fillText("A", A.x, A.y);
+  ctx.fillText("B", B.x, B.y);
+  ctx.fillText("C", C.x, C.y);
 }
-
-// Init
-generatePoints() 
-  
+// Init() 
+ generatePoints(); 
